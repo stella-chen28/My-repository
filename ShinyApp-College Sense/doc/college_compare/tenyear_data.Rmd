@@ -1,0 +1,73 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r}
+
+library(data.table)
+
+### read in data
+
+data08=fread("data/MERGED2007_08_PP.csv")
+data08=cbind(Year=2008,data08)
+data09=fread("data/MERGED2008_09_PP.csv")
+data09=cbind(Year=2009,data09)
+data10=fread("data/MERGED2009_10_PP.csv")
+data10=cbind(Year=2010,data10)
+data11=fread("data/MERGED2010_11_PP.csv")
+data11=cbind(Year=2011,data11)
+data12=fread("data/MERGED2011_12_PP.csv")
+data12=cbind(Year=2012,data12)
+data13=fread("data/MERGED2012_13_PP.csv")
+data13=cbind(Year=2013,data13)
+data14=fread("data/MERGED2013_14_PP.csv")
+data14=cbind(Year=2014,data14)
+data15=fread("data/MERGED2014_15_PP.csv")
+data15=cbind(Year=2015,data15)
+data16=fread("data/MERGED2015_16_PP.csv")
+data16=cbind(Year=2016,data16)
+data17=fread("data/MERGED2016_17_PP.csv")
+data17=cbind(Year=2017,data17)
+
+### universities intersection
+Colleges.Need=unlist(Reduce(fintersect,
+                            list(data08[,2],data09[,2],data10[,2],data11[,2],data12[,2],
+                               data13[,2],data14[,2],data15[,2],data16[,2],data17[,2])))
+
+
+data08=subset(data08,is.element(data08$UNITID,Colleges.Need))
+data09=subset(data09,is.element(data09$UNITID,Colleges.Need))
+data10=subset(data10,is.element(data10$UNITID,Colleges.Need))
+data11=subset(data11,is.element(data11$UNITID,Colleges.Need))
+data12=subset(data12,is.element(data12$UNITID,Colleges.Need))
+data13=subset(data13,is.element(data13$UNITID,Colleges.Need))
+data14=subset(data14,is.element(data14$UNITID,Colleges.Need))
+data15=subset(data15,is.element(data15$UNITID,Colleges.Need))
+data16=subset(data16,is.element(data16$UNITID,Colleges.Need))
+data17=subset(data17,is.element(data17$UNITID,Colleges.Need))
+
+
+### Select used columes
+Columes.Need=c("Year", "UNITID", "INSTNM","ADM_RATE","SATVRMID", "SATMTMID", "SATWRMID",                 "ACTCMMID", "ACTENMID", "ACTMTMID", "ACTWRMID", "SAT_AVG", "UGDS",                        "COSTT4_A", "TUITIONFEE_IN", "TUITIONFEE_OUT")
+
+
+### Merge data and order by UNITID
+Data=rbind(data08,data09,data10,data11,data12,data13,data14,data15,data16,data17)
+Data=Data[, Columes.Need, with=F]
+fulldata=setorder(Data,UNITID)
+
+fulldata$UGDS=as.numeric(fulldata$UGDS)
+
+#write.csv(fulldata,file="./data/fulldata.csv")
+
+```
+
+```{r}
+rankingdata<- read.csv("./data/ForbesRank.csv")
+mydata<- merge(fulldata,rankingdata,by.x = "INSTNM",by.y = "Name")
+write.csv(mydata,file="./data/mydata.csv")
+```
+

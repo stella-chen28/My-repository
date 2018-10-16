@@ -1,0 +1,95 @@
+---
+title: "Untitled"
+author: "Shichao Jia UNI:sj2854"
+date: "2018Äê10ÔÂ7ÈÕ"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+table <- read.csv(file="table_1.csv", header=TRUE, sep=",")
+dim
+table <- table[1:51,]
+colnames(table) <- c("State abb","State","Population change","Poverty popn","Labor Force","Employed","Unemployed","Unemployed rate","household income","max temp","min temp","heat_index","crime rate")
+write.csv(table, file = "table_final.csv")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+
+employ <- read.csv(file="uneploment.csv", header=TRUE, sep=",")
+employ <- subset(employ, Year == "2016" & Month == "November")
+employ <- employ[,3:5]
+employ$State <- state.abb[match(employ$State,state.name)]
+```
+
+
+```{r}
+if(!require("dplyr")) install.packages('dplyr')
+if(!require("stringr")) install.packages('stringr')
+
+library(stringr)
+library(dplyr)
+
+heat_index <- read.delim("heat_index.txt", header = T, sep = "")
+heat_index <- heat_index[1:3111, 1:3]
+Notes <- str_split_fixed(heat_index$Notes, ",", 2)
+heat_index$State <- Notes[,2]
+heat_index$County <- Notes[,1]
+heat_index$Notes <- NULL
+colnames(heat_index) <- c("County","index","State")
+heat_index <- heat_index[,c(3,1,2)]
+# heat_index$State <- trimws(heat_index$State,which = c("both", "left", "right"))
+```
+
+
+```{r}
+heat_index$State <- gsub( " ", "", heat_index$State) 
+# heat_index[1]
+# 
+# 
+# 
+# 
+# r<- right_join(heat_index,employ)
+# l<- left_join(heat_index,employ)
+# inner_join(r,l)
+total <- merge(heat_index,employ,by= c("County", "State"))
+
+```
+```{r}
+income <- read.csv("income.csv")
+```
+
+```{r}
+
+for(i in 1:nrow(heat_index)){
+  for (j in 1:ncol(heat_index)) {
+    if(heat_index[i,j]=="Missing"){
+      heat_index[i,j]=NA
+    }
+  }
+}
+heat_index_cleaned <- na.omit(heat_index)
+write.csv(employ,file = "employ.csv")
+write.csv(heat_index, file = "heat_index.csv")
+```

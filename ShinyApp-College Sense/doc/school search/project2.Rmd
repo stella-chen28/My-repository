@@ -1,0 +1,153 @@
+---
+title: "GR5243 project 2"
+author: "Chen, Yanchen yc3373"
+date: "October 8, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+```{r}
+if (!require("DT")) install.packages('DT')
+if (!require("dtplyr")) install.packages('dtplyr')
+if (!require("lubridate")) install.packages('lubridate')
+if (!require("ggmap")) install.packages('ggmap')
+if (!require("choroplethrZip")) {
+  # install.packages("devtools")
+  library(devtools)
+  install_github('arilamstein/choroplethrZip@v1.5.0')}
+
+library(dtplyr)
+library(dplyr)
+library(DT)
+library(lubridate)
+library(shiny)
+library(ggplot2)
+```
+
+
+```{r}
+data<-read.csv('.../cleanedData(1).csv', na.strings = "NULL")
+data[is.na(data)]=0
+data[,c(10:18,31)][data[,c(10:18,31)]<=200]=NA
+
+
+
+
+
+ui <- tabPanel('School recommendation',  fluidRow(
+  column(2,sliderInput("vr", label = "Sat verbal", min = 200, 
+                    max = 800, value = 500), #step=10  # value=500
+         hr(),
+         sliderInput("mt", label = "Sat math", min = 200, 
+                     max = 800, value = 500), #10 #value=500
+         hr(),
+         
+         sliderInput("act", label = "ACT", min = 1, 
+                     max = 36, value = 21), #value=20
+       
+         selectInput("hd", "Highest Degree", 
+           choices=c('Bachelor Degree','Graduate Degree',"Doesn't Matter"), selected = "Doesn't Matter"),
+          selectInput("type", "School Type", 
+           choices=c('Public','Private nonprofit',"Doesn't Matter"), selected = "Doesn't Matter")),
+  column(7,plotOutput('cPlot',click = "pc2"),plotOutput('DPlot',click = "pc")),column(2,verbatimTextOutput("intro"))))
+
+  conditionalPanel("false", icon("crosshair"))
+
+server <- function(input, output, session) {
+  ### ad rate & highest degree###
+
+   observe({
+   if (input$hd == "Graduate Degree"){
+      data=data[which(data[,88]=="Graduate degree"),]
+   }else if (input$hd == "Doesn't Matter"){
+     data=data
+   }else{
+     data=data[which(data[,88] != "Graduate degree"),]
+   }
+
+if (input$type == "Public"){
+      data=data[which(data[,"Schooltype"]=="Public"),]
+   }else if (input$type == "Doesn't Matter"){
+     data=data
+   }else{
+     data=data[which(data[,"Schooltype"] != "Public"),]
+   }
+   
+   
+
+  ###sat & act part###
+data=data[order(data[,'Rank']),]
+  
+  model=reactive({lm(data[,input$y]~data[,input$x])})
+  InverseRank=1/data[,'Rank']
+  Rank=data[,'Rank']
+  ylim1=reactive({max(data[,input$var])})
+  ylim2=reactive({min(data[,input$var])})
+  x=reactive({input$ho$x})
+  y=reactive({input$ho$y})
+  data$all25=data$SATVR25+data$SATMT25
+  data$all50=data$SATVRMID+data$SATMTMID
+  data$all75=data$SATVR75+data$SATMT75
+  diff=reactive({abs(data$SAT_AVG-ave())})
+  df=reactive({data[order(diff(),decreasing=F),][1:10,]})
+  ave=reactive({input$vr+input$mt})
+  act=reactive({input$act})
+  diff2=reactive({abs(data$ACTCMMID-act())})
+  df2=reactive({data[order(diff2(),decreasing=F),][1:10,]})
+  score=function(x,y,x1,y1){return((x-x1)^2+(y-y1)^2)}
+  name=reactive({as.character(data2$College)[which.min(score(x(),y(),data2[,input$x],data2[,input$y]))]})
+observeEvent(input$mt, {
+   ave=reactive({input$vr+input$mt})
+   data$all25=data$SATVR25+data$SATMT25
+   data$all50=data$SATVRMID+data$SATMTMID
+   data$all75=data$SATVR75+data$SATMT75
+   diff=reactive({abs(data$SAT_AVG-ave())})
+   df=reactive({data[order(diff()),][1:10,]})
+   output$cPlot <- renderPlot({
+     # Render a barplot
+     ggplot(data=df(), aes(x=factor(INSTNM),ymin=400,ymax=1600,lower=all25,middle=all50,upper=all75,fill=seq(400,1600,by = 130) ))+
+       geom_boxplot(stat="identity")+ 
+       theme(axis.text.x=element_text(angle = -90, hjust = 0))+
+       ylab('SAT')+
+        scale_fill_gradient(low="red", high="blue",limit=(c(400, 1600)))+
+       ylim(400,1600)+
+       labs(fill='SAT')+
+       xlab('College Name')+
+       geom_hline(aes(yintercept=ave()), colour="red")
+  }
+) 
+})
+  
+ observeEvent(input$act, {
+    act=reactive({input$act})
+    diff2=reactive({abs(data$ACTCMMID-act())})
+    df2=reactive({data[order(diff2(),decreasing=F),][1:10,]})
+    output$DPlot <- renderPlot({
+      # Render a barplot
+      ggplot(data=df2(), aes(x=factor(INSTNM),ymin=0,ymax=32,lower=ACTCM25,middle=ACTCMMID,upper=ACTCM75, fill=seq(0,36,length.out = 10)))+
+        geom_boxplot(stat="identity")+
+        theme(axis.text.x=element_text(angle = -90, hjust = 0))+
+        ylab('ACT')+
+        scale_fill_gradient(low="red", high="blue",limit=(c(0, 36)))+
+        ylim(0,32)+
+        labs(fill='ACT')+
+        xlab('College Name')+
+        geom_hline(aes(yintercept=act()),colour="red")
+      
+    })})
+}
+ )
+}
+
+shinyApp(ui, server)
+```
+
+
+
+

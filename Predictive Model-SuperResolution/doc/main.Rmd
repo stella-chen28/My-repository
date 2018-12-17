@@ -1,0 +1,430 @@
+---
+title: "Project 3 - Main Script - GBM & XGBoost"
+author: "Hengyang Lin"
+output: html_notebook
+---
+
+```{r, warning=FALSE}
+if(!require("EBImage")){
+  source("https://bioconductor.org/biocLite.R")
+  biocLite("EBImage")
+}
+
+if(!require("gbm")){
+  install.packages("gbm")
+}
+if(!require("OpenImageR")){
+  install.packages("OpenImageR")
+}
+library("EBImage")
+library("gbm")
+library(OpenImageR)
+```
+
+#Baseline implement
+
+### Step 0: specify directories.
+
+```{r wkdir, eval=FALSE}
+set.seed(2018)
+setwd("../doc")
+# here replace it with your own path or manually set it in RStudio to where this rmd file is located. 
+# use relative path for reproducibility
+```
+
+Provide directories for training images. Low-resolution (LR) image set and High-resolution (HR) image set will be in different subfolders. 
+```{r}
+train_dir <- "../data/train_set/" # This will be modified for different data sets.
+train_LR_dir <- paste(train_dir, "LR/", sep="")
+train_HR_dir <- paste(train_dir, "HR/", sep="")
+train_label_path <- paste(train_dir, "label.csv", sep="") 
+```
+
+### Step 1: set up controls for evaluation experiments.
+
+In this chunk, we have a set of controls for the evaluation experiments. 
+
++ (T/F) cross-validation on the training set
++ (number) K, the number of CV folds
++ (T/F) process features for training set
++ (T/F) run evaluation on an independent test set
++ (T/F) process features for test set
+
+```{r exp_setup}
+run.cv=TRUE # run cross-validation on the training set
+K <- 5  # number of CV folds
+run.feature.train=TRUE # process features for training set
+run.test=TRUE # run evaluation on an independent test set
+run.feature.test=TRUE # process features for test set
+```
+
+Using cross-validation or independent test set evaluation, we compare the performance of models with different specifications. In this example, we use GBM with different `depth`. In the following chunk, we list, in a vector, setups (in this case, `depth`) corresponding to models that we will compare.
+
+```{r model_setup}
+model_values <- c(3,5) #tuning between depth = 3 and depth = 5
+model_labels = paste("GBM with depth =", model_values)
+```
+
+### Step 2: construct features and responses
+
++ `feature.R`
+  + Input: a path for low-resolution images.
+  + Input: a path for high-resolution images.
+  + Input: Method ("Normal" to generate plain random sample; "Laplacian" & ratio to generate.)
+  + Input: Gap for number of features (n.feature = (2*gap + 1)^2 - 1)
+  + Output: an RData file that contains extracted features and corresponding responses
+
+```{r feature, warning=FALSE}
+source("../lib/feature_HYL.R")
+
+tm_feature_train <- NA
+if(run.feature.train){
+  tm_train_feature <- system.time(feat_train_N_1 <- feature(train_LR_dir, train_HR_dir))
+  feat_train <- feat_train_N_1$feature
+  label_train <- feat_train_N_1$label
+}
+
+save(feat_train_N_1, file="../output/feat_train_N_1.RData")
+```
+
+### Step 3 : Train a Regression model with training images
+
+Call the train model and test model from library.
+
++ `train.R`
+  + Input: dat_train = features, label_train = response
+  + Output: an RData file that contains trained classifiers in the forms of R objects: models/settings/links to external trained configurations.
++ `test.R`
+  + Input: ModelList (Trained Model)
+  + Input: dat_test (Test data. Number of col = (2*gap of modelList + 1)^2 - 1)
+  + Output: an R object of response predictions on the test set.
+```{r loadlib}
+source("../lib/train.R")
+source("../lib/test.R")
+```
+
+#### Model selection with cross-validation
+
+* Do model selection by choosing among different values of training model parameters, that is, the interaction depth for GBM in this example.
+```{r runcv, message=FALSE, warning=FALSE}
+source("../lib/cross_validation.R")
+
+if(run.cv){
+  err_cv <- array(dim=c(length(model_values), 2))
+  for(k in 1:length(model_values)){
+    cat("k=", k, "\n")
+    err_cv[k,] <- cv.function(feat_train, label_train, model_values[k], K)
+  }
+  save(err_cv, file="../output/err_cv.RData")
+}
+```
+
+* Visualize cross-validation results. 
+```{r cv_vis}
+if(run.cv){
+  load("../output/err_cv.RData")
+  plot(model_values, err_cv[,1], xlab="Interaction Depth", ylab="CV Error",
+       main="Cross Validation Error", type="n", ylim=c(0, 0.25))
+  points(model_values, err_cv[,1], col="blue", pch=16)
+  lines(model_values, err_cv[,1], col="blue")
+  arrows(model_values, err_cv[,1]-err_cv[,2], model_values, err_cv[,1]+err_cv[,2], 
+        length=0.1, angle=90, code=3)
+}
+```
+
+* Choose the "best"" parameter value
+```{r best_model}
+model_best=model_values[1]
+if(run.cv){
+  model_best <- model_values[which.min(err_cv[,1])]
+}
+
+par_best <- list(depth=model_best)
+```
+
+* Train the model with the entire training set using the selected model (model parameter) via cross-validation.
+```{r final_train}
+load("../output/feat_train_N_1.RData")
+feat_train <- feat_train_N_1$feature
+label_train <- feat_train_N_1$label
+
+tm_train_bench=NA
+tm_train_bench <- system.time(fit_bench_N_1 <- train(feat_train, label_train, par_best))
+save(fit_bench_N_1, file="../output/fit_bench_N_1.RData")
+```
+
+### Step 5: Super-resolution for test images
+Feed the final training model with the completely holdout testing data. 
++ `superResolution.R`
+  + Input: a path that points to the folder of low-resolution test images.
+  + Input: a path that points to the folder (empty) of high-resolution test images.
+  + Input: an R object that contains tuned predictors.
+  + Output: construct high-resolution versions for each low-resolution test image.
+```{r superresolution}
+source("../lib/superResolution_Stella.R")
+test_dir <- "../data/test_set/" # This will be modified for different data sets.
+test_LR_dir <- paste(test_dir, "LR/", sep="")
+test_Pred_dir <- paste(test_dir, "gbm_N_1_Pred/", sep="")
+
+tm_test_resolution = NA
+if(run.test){
+  load(file="../output/fit_bench_N_1.RData")
+  tm_test_resolution <- system.time(superResolution(test_LR_dir, test_Pred_dir, fit_bench_N_1))
+}
+```
+
+### Summarize Running Time
+Prediction performance matters, so does the running times for constructing features and for training the model, especially when the computation resource is limited. 
+```{r running_time}
+cat("Time for constructing training features=", tm_train_feature[1], "s \n")
+#cat("Time for constructing testing features=", tm_feature_test[1], "s \n")
+cat("Time for training model=", tm_train_bench[1], "s \n")
+cat("Time for super-resolution=", tm_test_resolution[1], "s \n")
+```
+
+#Improvement
+
+### Improvement A: Features with keypoints detection
+
+According to Shannon¡¯s sampling theorem, for better sampling efficiency, we should have a higher sample rate for high frequency signals, and can have a relatively lower sample rate for low frequency signals.
+
+If we could detect points on edges or changing dramatically, we could increase the weight of these keypoints in our sample, which can be regarded as high sample rate.
+
++ `feature.R`
+  + Input: a path for low-resolution images.
+  + Input: a path for high-resolution images.
+  + Input: Method ("Normal" to generate plain random sample; "Laplacian" & ratio to generate.)
+  + Input: Gap for number of features (n.feature = (2*gap + 1)^2 - 1)
+  + Output: an RData file that contains extracted features and corresponding responses
+  
+* Set method to "Laplacian", ratio as 0.7
+```{r, warning=FALSE}
+source("../lib/feature_HYL.R")
+
+tm_feature_train_L_1 <- NA
+if(run.feature.train){
+  tm_train_Lfeature <- system.time(feat_train_L_1 <- feature(train_LR_dir, train_HR_dir, method = "Laplacian", ratio = 0.7))
+  
+  feat_train <- feat_train_L_1$feature
+  label_train <- feat_train_L_1$label
+}
+
+save(feat_train_L_1, file="../output/feat_train_L_1.RData")
+```
+
+If we want to check the improvement from features data with keypoints detection, we shoudl perform previous GBM model on this dataset. And we expected lower RMSE.
+
+However, instead of perform GBM model, I would choose to change model first, and use the better or powerful new model to show both How new model improves and How new features data improves.
+
++ keypopints feature + GBM
+```{r, warnings=FALSE}
+load("../output/feat_train_L_1.RData")
+feat_train <- feat_train_L_1$feature
+label_train <- feat_train_L_1$label
+
+tm_train_gbm_L_1 = NA
+par_best <- list(depth = 5)
+tm_train_gbm_L_1 <- system.time(fit_gbm_L_1 <- train(feat_train, label_train, par_best))
+save(fit_gbm_L_1, file="../output/fit_gbm_L_1.RData")
+```
+
+
+### Improvement B: New model (XGBoost)
+
+In fact, XGBoost is the same as GBM in statistical meaning. However, XGBoost would be much more powerful, more fast, and with more parameters to tune.
+
+Call the train model and test model from library.
+
++ `XGB_train.R`
+  + Input: dat_train = features, label_train = response
+  + Output: an RData file that contains trained classifiers in the forms of R objects: models/settings/links to external trained configurations.
++ `XGB_test.R`
+  + Input: ModelList (Trained Model)
+  + Input: dat_test (Test data. Number of col = (2*gap of modelList + 1)^2 - 1)
+  + Output: an R object of response predictions on the test set.
+```{r}
+source("../lib/XGB_train.R")
+source("../lib/XGB_test.R")
+```
+
+#### Model selection with cross-validation
+
+* Do model selection by choosing among different values of training model parameters. (Using KeyPoints features)
+
+```{r, message=FALSE, warning=FALSE}
+source("../lib/XGB_CV.R")
+load("../output/feat_train_L_1.RData")
+feat_train <- feat_train_L_1$feature
+label_train <- feat_train_L_1$label
+
+if(run.cv){
+  xgb_cv_L_result <- XGB_crossvalidation(feat_train, label_train)
+  save(xgb_cv_L_result, file="../output/xgb_cv_L_result.RData")
+}
+```
+* Do model selection by choosing among different values of training model parameters. (Using RandomPoints features)
+
+```{r, message=FALSE, warning=FALSE}
+source("../lib/XGB_CV.R")
+load("../output/feat_train_N_1.RData")
+feat_train <- feat_train_N_1$feature
+label_train <- feat_train_N_1$label
+
+if(run.cv){
+  xgb_cv_N_result <- XGB_crossvalidation(feat_train, label_train)
+  save(xgb_cv_N_result, file="../output/xgb_cv_N_result.RData")
+}
+```
+
+* Train the model with the entire training set using the selected model (model parameter) via cross-validation.
+
++ keypoints feature + XGBoost
+```{r, warnings= FALSE}
+source("../lib/XGB_train.R")
+load("../output/feat_train_L_1.RData")
+feat_train <- feat_train_L_1$feature
+label_train <- feat_train_L_1$label
+
+
+tm_train_xgb_L_1 = NA
+par_best <- list(eta = 0.3, colsample_bytree = 0.8, max_depth = 6, nrounds = 150)
+
+tm_train_xgb_L_1 <- system.time(fit_xgb_L_1 <- XGB_train(feat_train, label_train, par_best))
+save(fit_xgb_L_1, file="../output/fit_xgb_L_1.RData")
+```
+
++ random selected points feature + XGBoost
+```{r, warnings= FALSE}
+source("../lib/XGB_train.R")
+load("../output/feat_train_N_1.RData")
+feat_train <- feat_train_N_1$feature
+label_train <- feat_train_N_1$label
+
+tm_train_xgb_N_1 = NA
+par_best <- list(eta = 0.3, colsample_bytree = 0.9, max_depth = 6, nrounds = 58)
+tm_train_xgb_N_1 <- system.time(fit_xgb_N_1 <- XGB_train(feat_train, label_train, par_best))
+save(fit_xgb_N_1, file="../output/fit_xgb_N_1.RData")
+```
+
+#### Super-resolution for test images
+Feed the final training model with the completely holdout testing data. 
++ `XGB_superResolution.R`
+  + Input: a path that points to the folder of low-resolution test images.
+  + Input: a path that points to the folder (empty) of predicted high-resolution test images.
+  + Input: an R object that contains tuned predictors.
+  + Output: construct high-resolution predictions for each low-resolution test image.
+  
+* Using Keypoints feature + XGBoost
+```{r}
+source("../lib/XGB_superResolution.R")
+test_dir <- "../data/test_set/"
+test_LR_dir <- paste(test_dir, "LR/", sep="")
+test_Pred_dir <- paste(test_dir, "xgb_L_1_Pred/", sep="")
+load("../output/fit_xgb_L_1.RData")
+
+tm_test_xgb_L_resolution = NA
+if(run.test){
+  tm_test_xgb_L_resolution <- system.time(XGB_superResolution(test_LR_dir, test_Pred_dir, fit_xgb_L_1))
+}
+```
+
+* Using random selected points feature + XGBoost
+```{r}
+source("../lib/XGB_superResolution.R")
+test_dir <- "../data/test_set/" # This will be modified for different data sets.
+test_LR_dir <- paste(test_dir, "LR/", sep="")
+test_Pred_dir <- paste(test_dir, "xgb_N_1_Pred/", sep="")
+load("../output/fit_xgb_N_1.RData")
+
+tm_test_xgb_N_resolution = NA
+if(run.test){
+  tm_test_xgb_N_resolution <- system.time(XGB_superResolution(test_LR_dir, test_Pred_dir, fit_xgb_N_1))
+}
+```
+
+* Using keypoints feature + GBM
+```{r}
+source("../lib/superResolution_Stella.R")
+test_dir <- "../data/test_set/" # This will be modified for different data sets.
+test_LR_dir <- paste(test_dir, "LR/", sep="")
+test_Pred_dir <- paste(test_dir, "gbm_L_1_Pred/", sep="")
+load("../output/fit_gbm_L_1.RData")
+
+tm_test_gbm_N_resolution=NA
+if(run.test){
+  tm_test_gbm_N_resolution <- system.time(superResolution(test_LR_dir, test_Pred_dir, fit_gbm_L_1))
+}
+```
+
+#Evaluation models
+
+Use error rate from fit model is unfair when we comparing the effect between random selected sample and keypoints sample, because keypoints sample are much more difficult to fit since their pixels change more dramatically.
+
+To evaluate the performance, we randomly choose 30 pictures and use 4 different conditions to "predict" HR versions, and compare them to true HR pictures. We compute the PSNR between predictions and true pictures for each condition to evaluate which condition is the best. Each condition consists of feature extraction method and regression method.
+
+
+#### Calculate the PSNR between predictions and true HR pictures
+
++ `calculate_psnr.R`
+  + Input: a path that points to the folder (empty) of predicted high-resolution test images.
+  + Input: a path that points to the folder of High-resolution test images.
+  + Output: The psnr between each pair of images and the total mean psnr for all the images in folders.
+
+* Evaluate random selected feature + GBM
+```{r}
+test_dir <- "../data/test_set/"
+HR_dir <- paste(test_dir, "HR/", sep ="")
+gbm_N_Pred_dir <- paste(test_dir, "gbm_N_1_Pred/", sep ="")
+
+source("../lib/calculate_psnr.R")
+result_gbm_N <- calculate_psnr(gbm_N_Pred_dir, HR_dir)
+```
+
+* Evaluate keypoints feature + GBM
+```{r}
+test_dir <- "../data/test_set/"
+HR_dir <- paste(test_dir, "HR/", sep ="")
+gbm_L_Pred_dir <- paste(test_dir, "gbm_L_1_Pred/", sep ="")
+
+source("../lib/calculate_psnr.R")
+result_gbm_L <- calculate_psnr(gbm_L_Pred_dir, HR_dir)
+```
+
+* Evaluate keypoints feature + XGBoost
+```{r}
+test_dir <- "../data/test_set/"
+HR_dir <- paste(test_dir, "HR/", sep ="")
+xgb_L_Pred_dir <- paste(test_dir, "xgb_L_1_Pred/", sep ="")
+
+source("../lib/calculate_psnr.R")
+result_xgb_L <- calculate_psnr(xgb_L_Pred_dir, HR_dir)
+```
+
+* Evaluate random selected points feature + XGBoost
+```{r}
+test_dir <- "../data/test_set/"
+HR_dir <- paste(test_dir, "HR/", sep ="")
+xgb_N_Pred_dir <- paste(test_dir, "xgb_N_1_Pred/", sep ="")
+
+source("../lib/calculate_psnr.R")
+result_xgb_N <- calculate_psnr(xgb_N_Pred_dir, HR_dir)
+```
+
+* Evaluate CNN
+```{r}
+test_dir <- "../data/test_set/"
+HR_dir <- paste(test_dir, "HR/", sep ="")
+CNN_Pred_dir <- paste(test_dir, "CNN_Pred/", sep ="")
+
+source("../lib/calculate_psnr.R")
+result_gbm_N <- calculate_psnr(CNN_Pred_dir, HR_dir)
+```
+#Further thoughts
+
+If we are going to expand our volume of train data, there are two ways:
+
+1. Expand the number of points on each image from 1000 to 3000.
+
+2. Expand the number of features on each point, from 8 to 24 while number of points remains.
+
+In both way, the volume of training data increase

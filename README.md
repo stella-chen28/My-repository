@@ -31,3 +31,9 @@ Here are the projects' summary and quick link, pick the ones you have interest i
     + Selected stocks out of S&P500 with high Sharpe Ratio. Did asset allocation by Mean-Variance analysis and Risk Parity method with R.
     + Combined with the risk-free asset (Treasury Bill) to construct optimal portfolio for different clients.
     + Used empirical distribution, t-distribution and GARCH model to do risk management, computed VaR.
+
+
+![image](doc/welcome-2-1030x397.jpg)
+**For more info: sc4248@columbia.edu**
+
+Thank you! Alwalys have a good day! :)

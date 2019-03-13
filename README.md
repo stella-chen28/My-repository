@@ -2,6 +2,7 @@
 
 Hi,there!
 Welcome to Stella's project warehouse!
+![image](doc/welcome-2-1030x397.jpg)
 
 Here are the projects' summary and quick link, pick the ones you have interest in:
 

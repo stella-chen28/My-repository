@@ -1,0 +1,172 @@
+---
+title: "fin"
+author: "weibo"
+date: "May 5, 2018"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r }
+#use 20130423 to 20160422 daily price
+rty<-read.csv("spx50_20130423to20160422.csv",header = T)
+
+ret<-log(rty[-1,]/rty[-nrow(rty),])#daily log return
+ret<-exp(ret)-1#convert into net return
+
+###Asset Allocation
+library(MASS)
+library(quadprog)
+
+rf<-0.0101/252
+```
+
+```{r}
+#50 stocks' portfolio
+
+ret50<-ret
+
+mu50 = colMeans(ret50)
+sigma50 = cov(ret50)
+
+
+muP50 = seq(min(mu50)+0.000001,max(mu50),length=200)  # target portfolio return
+sdP50 = muP50 # sd of portfolio return
+
+weight50 = matrix(0,nrow=200,ncol=50) # storage for portfolio weights
+for (i in 1:length(muP50))  # find the optimal portfolios
+{
+  result = solve.QP(Dmat=2*sigma50,dvec=rep(0,50),
+                    Amat=cbind(rep(1,50),mu50,diag(1,50)),
+                    bvec=c(1,muP50[i],rep(0,50)),meq=2)
+  sdP50[i] = sqrt(result$value)
+  weight50[i,] = result$solution
+}
+
+par(mfrow = c(1,1))
+plot(sdP50,muP50,type="l",xlim=c(0,0.025),ylim=c(0,0.0025),lwd=2,col="steelblue",
+     main = "Efficient Frontier of 50-stock Portfolio",
+     ylab = "Expected Daily Log Return",
+     xlab = "Risk")
+
+ind1_50 = (sdP50 == min(sdP50))
+points(sdP50[ind1_50],muP50[ind1_50],cex=1.1,pch="x")#MVP
+text(sdP50[ind1_50]+0.0015,muP50[ind1_50],"MVP",cex=1)
+text(0.001,rf,"Rf",cex=1)
+
+ind2_50 = (muP50 > muP50[ind1_50])
+lines(sdP50[ind2_50],muP50[ind2_50],type="l",xlim=c(0,.05),
+      ylim=c(0,.0015),lwd=2,col="orange")#efficient frontier
+
+points(0,rf,cex=1.1,pch="x") # show riskfree asset
+sharpe50 =(muP50-rf)/sdP50 # Sharpe's ratios
+ind3_50 = (sharpe50 == max(sharpe50)) # find maximum Sharpe's ratio
+lines(c(0,1),rf+c(0,1)*sharpe50[ind3_50],lwd=1,lty=2,col="black") # line of optimal portfolios
+points(sdP50[ind3_50],muP50[ind3_50],cex=1.1,pch="x")
+text(sdP50[ind3_50]+0.004,muP50[ind3_50],"tangent portfolio",cex=1)
+
+w50<-weight50[which.max(sharpe50),]
+```
+
+```{r}
+### 1. Empirical Distribution
+library(ggplot2)
+w50=as.matrix(w50)
+ret50.mat=as.matrix(ret50)
+portfolio=ret50.mat%*%w50  # the same as port50.rtn
+
+average=apply(ret50,1,sum)/ncol(ret50)
+alpha=0.05
+q_nonp = as.numeric(quantile(portfolio, alpha))
+q_nonp #value at risk according to historical data
+q_nonp_best_performer=as.numeric(quantile(ret50[,1], alpha))
+q_nonp_equal_weight=as.numeric(quantile(average, alpha))
+q_nonp_mediocre_performer=as.numeric(quantile(ret50[,floor(ncol(ret50)/2)], alpha))
+y=-67466*cbind(q_nonp,q_nonp_equal_weight,q_nonp_best_performer,q_nonp_mediocre_performer)
+ggplot(data= NULL, aes(x =colnames(y) , y = as.numeric(y)))+
+ geom_bar(stat="identity",width=0.5,position=position_dodge(0.6))+
+
+ labs(x = "Portfolio by type", y = "Dollars at risk", title = "Value at risk if you put your Columbia Tuition into each asset ")
+
+### 2. T Distribution model
+fit_t=fitdistr(portfolio,'t')
+mean = as.numeric(fit_t$estimate)[1]
+df = as.numeric(fit_t$estimate)[3]
+sd = as.numeric(fit_t$estimate)[2] * sqrt((df) / (df - 2))
+lambda = as.numeric(fit_t$estimate)[2]
+q_t_alpha = qt(alpha, df = df)
+#q_t_alpha
+VaR_t_port = (mean + lambda * q_t_alpha)
+
+###3.  VaR according to time series model
+portseries=ts(portfolio)
+plot(portseries)
+acf(portfolio)
+#acf(portfolio,main='',xlab='Lag (a)',ylab='ACF',las=1) #
+pacf(portfolio)
+
+averseries=ts(average)
+plot(averseries)
+acf(averseries)
+#acf(portfolio,main='',xlab='Lag (a)',ylab='ACF',las=1) #
+pacf(averseries)
+
+
+library(forecast)
+arima_model=auto.arima(portfolio,ic="bic") 
+arima_model
+#it is supposed that does not follow Arima model
+
+library(rugarch)
+library(fGarch)
+garch.t = ugarchspec(mean.model=list(armaOrder=c(0,0)),#variance.model=list(garchOrder=c(1,2)),
+distribution.model="std")
+sp.garch.t = ugarchfit(data=portfolio, spec=garch.t)
+show(sp.garch.t)
+alpha = 0.05
+nu = as.numeric(coef(sp.garch.t)[5])
+
+pred = ugarchforecast(sp.garch.t, data=portfolio, n.ahead=1)
+time_seris_VAR = as.numeric(qstd(alpha, mean=fitted(pred), sd=sigma(pred), nu=nu))
+
+z=-67466*cbind(q_nonp,VaR_t_port,time_seris_VAR)
+ggplot(data= NULL, aes(x =colnames(z) , y = as.numeric(z)))+
+ geom_bar(stat="identity",width=0.5,position=position_dodge(0.6))+
+ labs(x = "Method by type", y = "Dollars at risk", title = "Value at risk if you put your Columbia Tuition into each asset ")
+
+```
+
+
+```{r}
+### 4. Backtest
+
+r_test<-read.csv("spx_50.csv",header = F,as.is=T)
+rmm=which(r_test=="4/22/2016") #rmm=505
+r_test=r_test[1:505-1,]
+test=r_test[-2,-1]
+colnames(test)=test[1,]
+rty_test=as.data.frame(sapply(test[-1,], as.numeric))
+
+rettest<-log(rty_test[-1,]/rty_test[-nrow(rty_test),])#daily log return
+rettest<-exp(rettest)-1#convert into net return
+
+
+w50=as.matrix(w50)
+ret50_test.mat=as.matrix(rettest)
+portfolio_test=ret50_test.mat%*%w50 
+
+
+```
+
+```{r}
+backtest_nonp=sum(portfolio_test<q_nonp)/length(portfolio_test)
+backtest_nonp 
+
+backtest_t=sum(portfolio_test<VaR_t_port)/length(portfolio_test)
+backtest_t
+
+backtest_ts=sum(portfolio_test<time_seris_VAR)/length(portfolio_test)
+backtest_ts
+
+
+```

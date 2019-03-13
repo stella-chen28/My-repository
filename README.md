@@ -26,4 +26,7 @@ Here are the projects' summary and quick link, pick the ones you have interest i
     + Did data visualization on network analysis and word usage compare using ggplot2, wordcloud2, ggiraph, shiny.
     + Did Topic Modeling on the corpus from different groups of people and wrote a blog post using R Notebook.
     
-+ [Portfolio Construction for Different Communities]
++ [Portfolio Construction for Different Communities](https://github.com/stella-chen28/My-repository/tree/master/Portfolio%20Construction%20for%20Different%20Communities)
+    + Selected stocks out of S&P500 with high Sharpe Ratio. Did asset allocation by Mean-Variance analysis and Risk Parity method with R.
+    + Combined with the risk-free asset (Treasury Bill) to construct optimal portfolio for different clients.
+    + Used empirical distribution, t-distribution and GARCH model to do risk management, computed VaR.

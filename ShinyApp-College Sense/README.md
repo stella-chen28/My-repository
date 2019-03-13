@@ -1,4 +1,4 @@
-# Project 2: Shiny App Development Version 2.0
+# Project: Shiny App Development Version 2.0
 
 ## Project Title: College Sense
 
@@ -8,14 +8,6 @@
 
 Term: Fall 2018
 
-+ Team #: Group 6
-+ **Team Member**: 
-	+ Binglun Zhao bz2342@columbia.edu
-	+ Huiyu Zhang  hz2497@columbia.edu
-	+ Shichao Jia  sj2854@columbia.edu
-	+ Sizhu Chen   sc4248@columbia.edu
-	+ Yanchen Chen yc3373@columbia.edu
-	
 + **APP Entry**:  [College Sense](https://bz2342.shinyapps.io/fall2018-sec1-proj2-grp6/)
 
 + **Project Summary**: 
@@ -33,12 +25,6 @@ We believe our APP will definitely provide graduating high school students with 
    - https://wonder.cdc.gov/wonder
    - https://www.forbes.com/sites/nataliesportelli/2016/07/06/the-full-list-of-americas-top-colleges-2016/#191c50d569a4
 
-+ **Contribution Statement**:All team members approve our work presented in this GitHub repository including this contributions statement.
-   + Binglun Zhao: Tab intergration, Introduction and Contact Page designing, user interface improvement
-   + Huiyu Zhang: "College Information Map" Tab designing, data processing, visualization, and data cleaning 
-   + Shichao Jia: "College Environment" Tab designing, data cleaning and visulization
-   + Sizhu Chen: "College Comparison" Tab designing, data cleaning and processing, and visulization  
-   + Yanchen Chen: "College Scoreboard" Tab designing, data visulization and modeling
 
 Following [suggestions](http://nicercode.github.io/blog/2013-04-05-projects/) by [RICH FITZJOHN](http://nicercode.github.io/about/#Team) (@richfitz). This folder is orgarnized as follows.
 

@@ -34,6 +34,7 @@ Here are the projects' summary and quick link, pick the ones you have interest i
 
 
 <img src="https://github.com/stella-chen28/My-repository/blob/master/doc/arrow-contact-me.jpg" width="250">
-**For more info: sc4248@columbia.edu**
 
+**For more info: sc4248@columbia.edu**
+<br/>
 Thank you! Alwalys have a good day! :)

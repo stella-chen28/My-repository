@@ -33,7 +33,7 @@ Here are the projects' summary and quick link, pick the ones you have interest i
     + Used empirical distribution, t-distribution and GARCH model to do risk management, computed VaR.
 
 
-![image](doc/welcome-2-1030x397.jpg)
+![image](doc/arrow-contact-me.jpg)
 **For more info: sc4248@columbia.edu**
 
 Thank you! Alwalys have a good day! :)

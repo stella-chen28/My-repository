@@ -2,7 +2,7 @@
 
 ![image](figs/intro.png)
 
-### [Full Project Description](doc/project4_desc.md)
+### [Click to get access to the report](https://github.com/stella-chen28/My-repository/blob/master/Optical%20character%20recognition%20(OCR)%20with%20R/proj4_report.pdf)
 
 Term: Fall 2018
 
@@ -13,6 +13,7 @@ Term: Fall 2018
       + Step 4: Applied AdaBoost model to regress the labels on the six feature scores. The candidate correction word with highest probability will be chosen to replace the wrong word. <br/> 
       + Step 5: Evaluation -- the word-wise evaluation and character-wise evaluation. After post-processing, the recall and precision increases a lot especially in word level. 
 	
+## [Project description with more detail](doc/project4_desc.md)
 
 Following [suggestions](http://nicercode.github.io/blog/2013-04-05-projects/) by [RICH FITZJOHN](http://nicercode.github.io/about/#Team) (@richfitz). This folder is orgarnized as follows.
 

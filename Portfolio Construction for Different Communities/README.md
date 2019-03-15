@@ -1,7 +1,7 @@
 # Project: Portfolio Construction for Different Communities 
 
 
-### [Click to get access to the report](doc/project3_desc.md)
+### [Click to get access to the report](https://github.com/stella-chen28/My-repository/blob/master/Portfolio%20Construction%20for%20Different%20Communities/Slides.pdf)
 
 Term: Spring 2018
 

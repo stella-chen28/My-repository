@@ -10,7 +10,7 @@ Term: Fall 2018
 
 + This project is conducted by Sizhu Chen
 
-### [Click to get access to the report](project1_new.html)
+### [Click to get access to the report](project1_report.pdf)
 
 + Project summary: Compare keywords, word frequency, and word usage between happy moments of the single and the married, with data visualization methods, including wordcloud and ggplot. Do network analysis to compare word co-ocurrences and correlations and Topic Modeling to compare the difference in topics between the texts from two groups of people. Finally draw the conclusion that there are mainly three things getting changed after being married: the freedom of time, the role in relationship, and the maturity in psychology.
 
